@@ -218,6 +218,7 @@ void LadderEditor::RenderCanvas() {
                             return 0.18f * cw;
                         case ToolType::Timer:
                         case ToolType::Counter:
+                        case ToolType::Branch:
                             return 0.20f * cw;
                         default:
                             return 0.20f * cw;
@@ -477,10 +478,10 @@ void LadderEditor::DrawElementPreview(ImDrawList* drawList, ImVec2 center,
         break;
 
     case ToolType::Branch:
-        drawList->AddLine(ImVec2(center.x, center.y - half),
-                          ImVec2(center.x, center.y + half), color, 2.0f);
         drawList->AddLine(ImVec2(center.x - half, center.y),
-                          ImVec2(center.x, center.y), color, 2.0f);
+                          ImVec2(center.x + half, center.y), color, 2.0f);
+        drawList->AddLine(ImVec2(center.x, center.y),
+                          ImVec2(center.x, center.y + half), color, 2.0f);
         break;
 
     case ToolType::Text:
