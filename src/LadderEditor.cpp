@@ -151,11 +151,10 @@ void LadderEditor::RenderCanvas() {
 
     if (numCols != m_prevVisibleCols) {
         int newRight = numCols - 1;
-        for (auto& elem : m_elements) {
-            if (elem.type == ToolType::Coil || elem.type == ToolType::Output) {
-                if (elem.col >= numCols) {
-                    elem.col = newRight;
-                } else if (elem.col < newRight) {
+
+        if (numCols > m_prevVisibleCols) {
+            for (auto& elem : m_elements) {
+                if ((elem.type == ToolType::Coil || elem.type == ToolType::Output) && elem.col != newRight) {
                     bool occupied = false;
                     for (const auto& other : m_elements)
                         if (&other != &elem && other.rung == elem.rung && other.col == newRight)
@@ -165,6 +164,35 @@ void LadderEditor::RenderCanvas() {
                 }
             }
         }
+
+        if (numCols < m_prevVisibleCols) {
+            for (auto& coil : m_elements) {
+                if (coil.type == ToolType::Coil || coil.type == ToolType::Output) {
+                    bool conflict = false;
+                    for (const auto& other : m_elements)
+                        if (&other != &coil && other.rung == coil.rung && other.col == newRight
+                            && other.type != ToolType::Coil && other.type != ToolType::Output)
+                            { conflict = true; break; }
+
+                    if (conflict || coil.col > newRight) {
+                        std::vector<LadderElement*> nonCoils;
+                        for (auto& other : m_elements)
+                            if (&other != &coil && other.rung == coil.rung
+                                && other.type != ToolType::Coil && other.type != ToolType::Output)
+                                nonCoils.push_back(&other);
+                        std::sort(nonCoils.begin(), nonCoils.end(),
+                            [](const LadderElement* a, const LadderElement* b) { return a->col < b->col; });
+                        for (size_t i = 0; i < nonCoils.size(); ++i) {
+                            int maxCol = newRight > 0 ? newRight - 1 : 0;
+                            nonCoils[i]->col = (int)i < maxCol ? (int)i : maxCol;
+                        }
+                    }
+
+                    coil.col = newRight;
+                }
+            }
+        }
+
         m_prevVisibleCols = numCols;
     }
     m_visibleCols = numCols;
