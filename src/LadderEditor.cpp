@@ -91,6 +91,10 @@ void LadderEditor::Render() {
         m_selectedTool = ToolType::Select;
     }
 
+    if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) && m_lastHoveredRung >= 0 && m_lastHoveredCol >= 0) {
+        RemoveElement(m_lastHoveredRung, m_lastHoveredCol);
+    }
+
     style.WindowRounding = prevRounding;
 
     RenderStatusBar();
@@ -299,8 +303,12 @@ void LadderEditor::RenderCanvas() {
                     IM_COL32(255, 255, 255, 20)
                 );
 
-                if (m_selectedTool != ToolType::Select && ImGui::IsMouseClicked(0)) {
-                    PlaceElement(m_selectedTool, r, c);
+                if (ImGui::IsMouseClicked(0)) {
+                    if (m_selectedTool == ToolType::Select) {
+                        RemoveElement(r, c);
+                    } else {
+                        PlaceElement(m_selectedTool, r, c);
+                    }
                     ImGui::ResetMouseDragDelta();
                 }
             }
