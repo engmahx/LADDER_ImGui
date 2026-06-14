@@ -151,20 +151,18 @@ void LadderEditor::RenderCanvas() {
 
     if (numCols != m_prevVisibleCols) {
         int newRight = numCols - 1;
-        for (size_t i = 0; i < m_elements.size(); ++i) {
-            if (m_elements[i].type == ToolType::Coil || m_elements[i].type == ToolType::Output) {
-                for (size_t j = 0; j < m_elements.size(); ) {
-                    if (i != j && m_elements[j].rung == m_elements[i].rung
-                        && m_elements[j].col == newRight
-                        && m_elements[j].type != ToolType::Coil
-                        && m_elements[j].type != ToolType::Output) {
-                        m_elements.erase(m_elements.begin() + j);
-                        if (i > j) --i;
-                    } else {
-                        ++j;
-                    }
+        for (auto& elem : m_elements) {
+            if (elem.type == ToolType::Coil || elem.type == ToolType::Output) {
+                if (elem.col >= numCols) {
+                    elem.col = newRight;
+                } else if (elem.col < newRight) {
+                    bool occupied = false;
+                    for (const auto& other : m_elements)
+                        if (&other != &elem && other.rung == elem.rung && other.col == newRight)
+                            { occupied = true; break; }
+                    if (!occupied)
+                        elem.col = newRight;
                 }
-                m_elements[i].col = newRight;
             }
         }
         m_prevVisibleCols = numCols;
