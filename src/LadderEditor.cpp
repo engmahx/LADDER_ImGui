@@ -362,7 +362,7 @@ void LadderEditor::RenderCanvas() {
                         elem.type, col);
                     {
                         ImVec2 ts = ImGui::CalcTextSize(elem.tagName.c_str());
-                        float fontSize = ImGui::GetFontSize() * 1.4f;
+                        float fontSize = ImGui::GetFontSize() * 2.0f;
                         float tsx = ts.x * (fontSize / ImGui::GetFontSize());
                         float tx = cellCenterX - tsx * 0.5f;
                         float ty = cellCenterY - colWidth * 0.2f - fontSize * 1.1f;
