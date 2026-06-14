@@ -362,11 +362,10 @@ void LadderEditor::RenderCanvas() {
                         elem.type, col);
                     {
                         ImVec2 ts = ImGui::CalcTextSize(elem.tagName.c_str());
-                        float sx = ts.x * 0.5f;
-                        float tx = cellCenterX - sx;
-                        float ty = cellY + rungHeight - 14 * z;
-                        drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * z * 0.65f,
-                            ImVec2(tx, ty), IM_COL32(200, 200, 200, 200),
+                        float tx = cellCenterX - ts.x * 0.5f;
+                        float ty = cellY + 4 * z;
+                        drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+                            ImVec2(tx, ty), IM_COL32(200, 200, 200, 220),
                             elem.tagName.c_str());
                     }
                     hasElement = true;
@@ -390,8 +389,15 @@ void LadderEditor::RenderCanvas() {
     if (m_isDragging && ImGui::IsMouseReleased(0)) {
         if (m_lastHoveredRung >= 0 && m_lastHoveredCol >= 0
             && !(m_lastHoveredRung == m_dragRung && m_lastHoveredCol == m_dragCol)) {
+            std::string savedTag;
+            for (const auto& e : m_elements)
+                if (e.rung == m_dragRung && e.col == m_dragCol)
+                    { savedTag = e.tagName; break; }
             RemoveElement(m_dragRung, m_dragCol);
             PlaceElement(m_dragType, m_lastHoveredRung, m_lastHoveredCol);
+            for (auto& e : m_elements)
+                if (e.rung == m_lastHoveredRung && e.col == m_lastHoveredCol)
+                    { e.tagName = savedTag; break; }
             m_selRung = m_lastHoveredRung;
             m_selCol = m_lastHoveredCol;
         }
