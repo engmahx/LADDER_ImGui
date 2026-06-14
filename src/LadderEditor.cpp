@@ -82,6 +82,10 @@ void LadderEditor::Render() {
     ImGui::Text("Elements: %d", elemCount);
     ImGui::End();
 
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+        m_selectedTool = ToolType::Select;
+    }
+
     style.WindowRounding = prevRounding;
 
     RenderStatusBar();
