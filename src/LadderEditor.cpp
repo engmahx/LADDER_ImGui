@@ -338,18 +338,27 @@ void LadderEditor::RenderCanvas() {
                 }
 
                 if (m_selectedTool == ToolType::Select && ImGui::IsMouseClicked(0)) {
+                    bool found = false;
                     for (const auto& elem : m_elements)
                         if (elem.rung == r && elem.col == c) {
                             m_selRung = r;
                             m_selCol = c;
+                            found = true;
                             break;
                         }
+                    if (!found) { m_selRung = -1; m_selCol = -1; }
                 }
             }
 
             bool hasElement = false;
             for (const auto& elem : m_elements) {
                 if (elem.rung == r && elem.col == c) {
+                    if (m_selRung == r && m_selCol == c) {
+                        drawList->AddRect(
+                            ImVec2(cellX + 2, cellY + 2),
+                            ImVec2(cellX + colWidth - 2, cellY + rungHeight - 2),
+                            IM_COL32(255, 255, 100, 200), 0.0f, 0, 2.5f);
+                    }
                     ImU32 col = ToolColors[(int)elem.type];
                     if (m_isDragging && elem.rung == m_dragRung && elem.col == m_dragCol)
                         col = (col & 0x00FFFFFF) | 0x40000000;
