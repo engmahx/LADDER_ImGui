@@ -189,11 +189,34 @@ void LadderEditor::RenderCanvas() {
         );
 
         float wireY = rungY + rungHeight * 0.5f;
-        drawList->AddLine(
-            ImVec2(gridOrigin.x - 6 * z, wireY),
-            ImVec2(rightRailX + 6 * z, wireY),
-            IM_COL32(200, 210, 230, 160), 1.5f * z
-        );
+        {
+            std::vector<int> elemCols;
+            for (const auto& elem : m_elements)
+                if (elem.rung == r)
+                    elemCols.push_back(elem.col);
+            std::sort(elemCols.begin(), elemCols.end());
+
+            float railL = gridOrigin.x - 6 * z;
+            float railR = rightRailX + 6 * z;
+            ImU32 wireCol = IM_COL32(200, 210, 230, 160);
+            float wireThick = 1.5f * z;
+
+            if (elemCols.empty()) {
+                drawList->AddLine(ImVec2(railL, wireY), ImVec2(railR, wireY), wireCol, wireThick);
+            } else {
+                drawList->AddLine(
+                    ImVec2(railL, wireY),
+                    ImVec2(gridOrigin.x + elemCols[0] * colWidth, wireY), wireCol, wireThick);
+                for (size_t ei = 1; ei < elemCols.size(); ++ei) {
+                    float x1 = gridOrigin.x + elemCols[ei - 1] * colWidth + colWidth;
+                    float x2 = gridOrigin.x + elemCols[ei] * colWidth;
+                    drawList->AddLine(ImVec2(x1, wireY), ImVec2(x2, wireY), wireCol, wireThick);
+                }
+                drawList->AddLine(
+                    ImVec2(gridOrigin.x + elemCols.back() * colWidth + colWidth, wireY),
+                    ImVec2(railR, wireY), wireCol, wireThick);
+            }
+        }
 
         for (int c = 0; c < numCols; ++c) {
             float cellX = gridOrigin.x + c * colWidth;
