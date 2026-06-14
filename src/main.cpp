@@ -53,7 +53,7 @@ int main(int, char**) {
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    io.Fonts->AddFontFromFileTTF("JetBrainsMono-Regular.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesDefault());
+    io.Fonts->AddFontFromFileTTF("JetBrainsMono-Regular.ttf", 24.0f, nullptr, io.Fonts->GetGlyphRangesDefault());
     io.Fonts->Build();
 
     ImGui::StyleColorsDark();
