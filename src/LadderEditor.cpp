@@ -27,7 +27,7 @@ static_assert(sizeof(ToolNames) / sizeof(ToolNames[0]) == (size_t)ToolType::Coun
 static_assert(sizeof(ToolColors) / sizeof(ToolColors[0]) == (size_t)ToolType::Count);
 
 LadderEditor::LadderEditor()
-    : m_gridSpacing(24.0f)
+    : m_gridSpacing(30.0f)
     , m_dotRadius(1.5f)
     , m_zoom(1.0f)
     , m_selectedTool(ToolType::Select)
@@ -80,7 +80,7 @@ void LadderEditor::Render() {
     ImGui::Text("Selected Tool: %s", ToolNames[(int)m_selectedTool]);
     ImGui::Separator();
     ImGui::Text("Grid Spacing");
-    ImGui::SliderFloat("##grid", &m_gridSpacing, 12.0f, 48.0f, "%.0f");
+    ImGui::SliderFloat("##grid", &m_gridSpacing, 25.0f, 50.0f, "%.0f");
     ImGui::Text("Zoom");
     ImGui::SliderFloat("##zoom", &m_zoom, 0.5f, 2.0f, "%.2f");
     int elemCount = (int)m_elements.size();
