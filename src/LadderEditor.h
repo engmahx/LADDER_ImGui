@@ -67,5 +67,7 @@ private:
     int m_selRung;
     int m_selCol;
 
+    int m_selectedRung;
+
     std::vector<LadderElement> m_elements;
 };

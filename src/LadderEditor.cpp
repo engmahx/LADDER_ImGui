@@ -43,6 +43,7 @@ LadderEditor::LadderEditor()
     , m_dragType(ToolType::Select)
     , m_selRung(-1)
     , m_selCol(-1)
+    , m_selectedRung(-1)
 {
 }
 
@@ -118,6 +119,7 @@ void LadderEditor::Render() {
         m_selectedTool = ToolType::Select;
         m_selRung = -1;
         m_selCol = -1;
+        m_selectedRung = -1;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) && m_lastHoveredRung >= 0 && m_lastHoveredCol >= 0) {
@@ -332,6 +334,7 @@ void LadderEditor::RenderCanvas() {
 
                 if (m_selectedTool != ToolType::Select && ImGui::IsMouseClicked(0)) {
                     PlaceElement(m_selectedTool, r, c);
+                    m_selectedRung = r;
                     ImGui::ResetMouseDragDelta();
                 }
 
@@ -341,6 +344,7 @@ void LadderEditor::RenderCanvas() {
                         if (elem.rung == r && elem.col == c) {
                             m_selRung = r;
                             m_selCol = c;
+                            m_selectedRung = r;
                             found = true;
                             break;
                         }
@@ -383,6 +387,20 @@ void LadderEditor::RenderCanvas() {
                     ImVec2(cellCenterX, cellCenterY), colWidth * 0.4f,
                     m_selectedTool, ToolColors[(int)m_selectedTool]);
             }
+        }
+
+        if (ImGui::IsMouseHoveringRect(
+            ImVec2(gridOrigin.x - 8 * z, rungY),
+            ImVec2(rightRailX + 8 * z, rungY + rungHeight))
+            && ImGui::IsMouseClicked(0) && m_selectedTool == ToolType::Select) {
+            m_selectedRung = r;
+        }
+
+        if (m_selectedRung == r) {
+            drawList->AddRectFilled(
+                ImVec2(gridOrigin.x - 12 * z, rungY),
+                ImVec2(gridOrigin.x - 8 * z, rungY + rungHeight),
+                IM_COL32(255, 255, 100, 200));
         }
     }
 
@@ -559,17 +577,25 @@ void LadderEditor::RenderToolsPanel() {
     ImGui::Text("Rungs: %d  Cols: %d", m_rungCount, m_visibleCols);
     ImGui::Text("Zoom: %.0f%%", m_zoom * 100);
     if (ImGui::Button("+ Add Rung", ImVec2(-1, 28))) {
+        int insertAfter = (m_selectedRung >= 0 && m_selectedRung < m_rungCount) ? m_selectedRung : (m_rungCount - 1);
+        for (auto& e : m_elements)
+            if (e.rung > insertAfter)
+                ++e.rung;
         ++m_rungCount;
+        m_selectedRung = insertAfter + 1;
     }
-    if (ImGui::Button("- Remove Last Rung", ImVec2(-1, 28)) && m_rungCount > 1) {
+    if (ImGui::Button("- Remove Selected Rung", ImVec2(-1, 28)) && m_rungCount > 1) {
+        int target = (m_selectedRung >= 0 && m_selectedRung < m_rungCount) ? m_selectedRung : (m_rungCount - 1);
         for (auto it = m_elements.begin(); it != m_elements.end(); ) {
-            if (it->rung == m_rungCount - 1) {
+            if (it->rung == target) {
                 it = m_elements.erase(it);
             } else {
+                if (it->rung > target) --it->rung;
                 ++it;
             }
         }
         --m_rungCount;
+        m_selectedRung = (target < m_rungCount) ? target : (m_rungCount - 1);
     }
 }
 
