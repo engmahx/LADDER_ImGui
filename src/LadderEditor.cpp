@@ -228,18 +228,6 @@ void LadderEditor::RenderCanvas() {
             IM_COL32(60, 120, 200, 200)
         );
 
-        drawList->AddLine(
-            ImVec2(gridOrigin.x - 6 * z, rungY),
-            ImVec2(rightRailX + 6 * z, rungY),
-            IM_COL32(80, 140, 220, 180)
-        );
-
-        drawList->AddLine(
-            ImVec2(gridOrigin.x - 6 * z, rungY + rungHeight),
-            ImVec2(rightRailX + 6 * z, rungY + rungHeight),
-            IM_COL32(80, 140, 220, 180)
-        );
-
         float wireY = rungY + rungHeight * 0.5f;
         {
             std::vector<int> elemCols;
