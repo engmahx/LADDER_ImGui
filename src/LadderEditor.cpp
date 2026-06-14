@@ -82,7 +82,7 @@ void LadderEditor::Render() {
     ImGui::Text("Grid Spacing");
     ImGui::SliderFloat("##grid", &m_gridSpacing, 12.0f, 48.0f, "%.0f");
     ImGui::Text("Zoom");
-    ImGui::SliderFloat("##zoom", &m_zoom, 0.25f, 3.0f, "%.2f");
+    ImGui::SliderFloat("##zoom", &m_zoom, 0.5f, 2.0f, "%.2f");
     int elemCount = (int)m_elements.size();
     ImGui::Text("Elements: %d", elemCount);
     ImGui::End();
