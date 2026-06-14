@@ -2,6 +2,10 @@
 #include <cmath>
 #include <algorithm>
 
+#ifndef IM_PI
+#define IM_PI 3.14159265358979323846f
+#endif
+
 static const char* ToolNames[] = {
     "Select", "NO", "NC", "Coil", "Output",
     "Timer", "Counter", "Branch", "Text"
@@ -456,9 +460,11 @@ void LadderEditor::DrawElementPreview(ImDrawList* drawList, ImVec2 center,
     case ToolType::Coil:
     case ToolType::Output: {
         float r = half * 0.45f;
-        drawList->PathArcToFast(ImVec2(center.x - r, center.y), r, 9, 3);
+        drawList->PathArcTo(ImVec2(center.x - r, center.y), r,
+            IM_PI * 0.5f, IM_PI * 1.5f);
         drawList->PathStroke(color, false, 3.0f);
-        drawList->PathArcToFast(ImVec2(center.x + r, center.y), r, 3, 9);
+        drawList->PathArcTo(ImVec2(center.x + r, center.y), r,
+            IM_PI * 1.5f, IM_PI * 2.5f);
         drawList->PathStroke(color, false, 3.0f);
         break;
     }
