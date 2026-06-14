@@ -37,6 +37,10 @@ LadderEditor::LadderEditor()
     , m_visibleRungs(0)
     , m_visibleCols(0)
     , m_prevVisibleCols(0)
+    , m_isDragging(false)
+    , m_dragRung(-1)
+    , m_dragCol(-1)
+    , m_dragType(ToolType::Select)
 {
 }
 
@@ -307,14 +311,28 @@ void LadderEditor::RenderCanvas() {
                     PlaceElement(m_selectedTool, r, c);
                     ImGui::ResetMouseDragDelta();
                 }
+
+                if (m_selectedTool == ToolType::Select && ImGui::IsMouseClicked(0)) {
+                    for (const auto& elem : m_elements)
+                        if (elem.rung == r && elem.col == c) {
+                            m_isDragging = true;
+                            m_dragRung = r;
+                            m_dragCol = c;
+                            m_dragType = elem.type;
+                            break;
+                        }
+                }
             }
 
             bool hasElement = false;
             for (const auto& elem : m_elements) {
                 if (elem.rung == r && elem.col == c) {
+                    ImU32 col = ToolColors[(int)elem.type];
+                    if (m_isDragging && elem.rung == m_dragRung && elem.col == m_dragCol)
+                        col = (col & 0x00FFFFFF) | 0x40000000;
                     DrawElementPreview(drawList,
                         ImVec2(cellCenterX, cellCenterY), colWidth * 0.4f,
-                        elem.type, ToolColors[(int)elem.type]);
+                        elem.type, col);
                     hasElement = true;
                     break;
                 }
@@ -332,6 +350,25 @@ void LadderEditor::RenderCanvas() {
     ImGui::InvisibleButton("canvas_bg", canvasSize,
                            ImGuiButtonFlags_MouseButtonLeft |
                            ImGuiButtonFlags_MouseButtonRight);
+
+    if (m_isDragging && ImGui::IsMouseReleased(0)) {
+        if (m_lastHoveredRung >= 0 && m_lastHoveredCol >= 0
+            && !(m_lastHoveredRung == m_dragRung && m_lastHoveredCol == m_dragCol)) {
+            RemoveElement(m_dragRung, m_dragCol);
+            PlaceElement(m_dragType, m_lastHoveredRung, m_lastHoveredCol);
+        }
+        m_isDragging = false;
+    }
+
+    if (m_isDragging) {
+        ImVec2 mp = ImGui::GetMousePos();
+        drawList->AddRectFilled(
+            ImVec2(mp.x - colWidth * 0.5f, mp.y - rungHeight * 0.5f),
+            ImVec2(mp.x + colWidth * 0.5f, mp.y + rungHeight * 0.5f),
+            IM_COL32(255, 255, 255, 25));
+        DrawElementPreview(drawList, mp, colWidth * 0.4f,
+            m_dragType, ToolColors[(int)m_dragType]);
+    }
 
     if (ImGui::BeginPopupContextWindow("ElementMenu")) {
         ImGui::Text("Insert Element");

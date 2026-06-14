@@ -58,5 +58,10 @@ private:
     int m_visibleCols;
     int m_prevVisibleCols;
 
+    bool m_isDragging;
+    int m_dragRung;
+    int m_dragCol;
+    ToolType m_dragType;
+
     std::vector<LadderElement> m_elements;
 };
