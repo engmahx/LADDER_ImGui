@@ -190,30 +190,11 @@ void LadderEditor::RenderCanvas() {
 
         float wireY = rungY + rungHeight * 0.5f;
         {
-            std::vector<int> elemCols;
-            for (const auto& elem : m_elements)
-                if (elem.rung == r)
-                    elemCols.push_back(elem.col);
-            std::sort(elemCols.begin(), elemCols.end());
-
-            float cw = colWidth;
             float railL = gridOrigin.x - 6 * z;
             float railR = rightRailX + 6 * z;
             ImU32 wireCol = IM_COL32(200, 210, 230, 160);
             float wireThick = 1.5f * z;
-            float elemGap = 0.3f * cw;
-
-            auto elemLeft = [&](int col) { return gridOrigin.x + col * cw + elemGap; };
-            auto elemRight = [&](int col) { return gridOrigin.x + col * cw + cw - elemGap; };
-
-            if (elemCols.empty()) {
-                drawList->AddLine(ImVec2(railL, wireY), ImVec2(railR, wireY), wireCol, wireThick);
-            } else {
-                drawList->AddLine(ImVec2(railL, wireY), ImVec2(elemLeft(elemCols[0]), wireY), wireCol, wireThick);
-                for (size_t ei = 1; ei < elemCols.size(); ++ei)
-                    drawList->AddLine(ImVec2(elemRight(elemCols[ei - 1]), wireY), ImVec2(elemLeft(elemCols[ei]), wireY), wireCol, wireThick);
-                drawList->AddLine(ImVec2(elemRight(elemCols.back()), wireY), ImVec2(railR, wireY), wireCol, wireThick);
-            }
+            drawList->AddLine(ImVec2(railL, wireY), ImVec2(railR, wireY), wireCol, wireThick);
         }
 
         for (int c = 0; c < numCols; ++c) {
@@ -246,6 +227,12 @@ void LadderEditor::RenderCanvas() {
             bool hasElement = false;
             for (const auto& elem : m_elements) {
                 if (elem.rung == r && elem.col == c) {
+                    float maskInset = colWidth * 0.08f;
+                    float maskH = rungHeight * 0.55f;
+                    drawList->AddRectFilled(
+                        ImVec2(cellX + maskInset, wireY - maskH * 0.5f),
+                        ImVec2(cellX + colWidth - maskInset, wireY + maskH * 0.5f),
+                        ImGui::GetColorU32(ImGuiCol_WindowBg));
                     DrawElementPreview(drawList,
                         ImVec2(cellCenterX, cellCenterY), colWidth * 0.4f,
                         elem.type, ToolColors[(int)elem.type]);
@@ -433,9 +420,15 @@ void LadderEditor::DrawElementPreview(ImDrawList* drawList, ImVec2 center,
         break;
 
     case ToolType::Coil:
-    case ToolType::Output:
-        drawList->AddCircle(center, half * 0.6f, color, 0, 2.5f);
+    case ToolType::Output: {
+        float r = half * 0.45f;
+        float gap = half * 0.3f;
+        drawList->PathArcToFast(ImVec2(center.x - gap, center.y), r, 9, 3);
+        drawList->PathStroke(color, false, 2.5f);
+        drawList->PathArcToFast(ImVec2(center.x + gap, center.y), r, 3, 9);
+        drawList->PathStroke(color, false, 2.5f);
         break;
+    }
 
     case ToolType::Timer:
     case ToolType::Counter:
