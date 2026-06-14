@@ -303,12 +303,8 @@ void LadderEditor::RenderCanvas() {
                     IM_COL32(255, 255, 255, 20)
                 );
 
-                if (ImGui::IsMouseClicked(0)) {
-                    if (m_selectedTool == ToolType::Select) {
-                        RemoveElement(r, c);
-                    } else {
-                        PlaceElement(m_selectedTool, r, c);
-                    }
+                if (m_selectedTool != ToolType::Select && ImGui::IsMouseClicked(0)) {
+                    PlaceElement(m_selectedTool, r, c);
                     ImGui::ResetMouseDragDelta();
                 }
             }
