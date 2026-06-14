@@ -340,10 +340,6 @@ void LadderEditor::RenderCanvas() {
                 if (m_selectedTool == ToolType::Select && ImGui::IsMouseClicked(0)) {
                     for (const auto& elem : m_elements)
                         if (elem.rung == r && elem.col == c) {
-                            m_isDragging = true;
-                            m_dragRung = r;
-                            m_dragCol = c;
-                            m_dragType = elem.type;
                             m_selRung = r;
                             m_selCol = c;
                             break;
@@ -387,6 +383,17 @@ void LadderEditor::RenderCanvas() {
     ImGui::InvisibleButton("canvas_bg", canvasSize,
                            ImGuiButtonFlags_MouseButtonLeft |
                            ImGuiButtonFlags_MouseButtonRight);
+
+    if (!m_isDragging && m_selRung >= 0 && ImGui::IsMouseDragging(0, 4.0f)) {
+        for (const auto& e : m_elements)
+            if (e.rung == m_selRung && e.col == m_selCol) {
+                m_isDragging = true;
+                m_dragRung = m_selRung;
+                m_dragCol = m_selCol;
+                m_dragType = e.type;
+                break;
+            }
+    }
 
     if (m_isDragging && ImGui::IsMouseReleased(0)) {
         if (m_lastHoveredRung >= 0 && m_lastHoveredCol >= 0
