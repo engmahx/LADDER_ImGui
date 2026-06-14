@@ -522,10 +522,30 @@ void LadderEditor::DrawElementPreview(ImDrawList* drawList, ImVec2 center,
     }
 
     case ToolType::Timer:
+        drawList->AddRect(ImVec2(center.x - half, center.y - half * 0.6f),
+                          ImVec2(center.x + half, center.y + half * 0.6f),
+                          color, 0.0f, 0, 2.0f);
+        {
+            const char* txt = "TON";
+            ImVec2 ts = ImGui::CalcTextSize(txt);
+            float scale = (half * 1.2f) / ts.y * 0.7f;
+            drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * scale,
+                ImVec2(center.x - ts.x * scale * 0.5f, center.y - ts.y * scale * 0.5f),
+                color, txt);
+        }
+        break;
     case ToolType::Counter:
         drawList->AddRect(ImVec2(center.x - half, center.y - half * 0.6f),
                           ImVec2(center.x + half, center.y + half * 0.6f),
                           color, 0.0f, 0, 2.0f);
+        {
+            const char* txt = "CTU";
+            ImVec2 ts = ImGui::CalcTextSize(txt);
+            float scale = (half * 1.2f) / ts.y * 0.7f;
+            drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * scale,
+                ImVec2(center.x - ts.x * scale * 0.5f, center.y - ts.y * scale * 0.5f),
+                color, txt);
+        }
         break;
 
     case ToolType::Branch:
