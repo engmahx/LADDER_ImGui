@@ -55,3 +55,9 @@ endif()
 if(APPLE)
   target_link_libraries(LadderEditor PRIVATE "-framework OpenGL")
 endif()
+
+add_custom_command(TARGET LadderEditor POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${CMAKE_SOURCE_DIR}/fonts/JetBrainsMono-Regular.ttf"
+    "$<TARGET_FILE_DIR:LadderEditor>/JetBrainsMono-Regular.ttf"
+)
