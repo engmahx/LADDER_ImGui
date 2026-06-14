@@ -188,6 +188,13 @@ void LadderEditor::RenderCanvas() {
             IM_COL32(80, 140, 220, 180)
         );
 
+        float wireY = rungY + rungHeight * 0.5f;
+        drawList->AddLine(
+            ImVec2(gridOrigin.x - 6 * z, wireY),
+            ImVec2(rightRailX + 6 * z, wireY),
+            IM_COL32(200, 210, 230, 160), 1.5f * z
+        );
+
         for (int c = 0; c < numCols; ++c) {
             float cellX = gridOrigin.x + c * colWidth;
             float cellY = rungY;
