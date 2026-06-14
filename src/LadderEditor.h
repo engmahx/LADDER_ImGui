@@ -21,6 +21,7 @@ struct LadderElement {
     int rung;
     int col;
     std::string label;
+    std::string tagName;
 };
 
 class LadderEditor {
@@ -62,6 +63,9 @@ private:
     int m_dragRung;
     int m_dragCol;
     ToolType m_dragType;
+
+    int m_selRung;
+    int m_selCol;
 
     std::vector<LadderElement> m_elements;
 };

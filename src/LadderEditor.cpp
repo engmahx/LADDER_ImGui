@@ -41,6 +41,8 @@ LadderEditor::LadderEditor()
     , m_dragRung(-1)
     , m_dragCol(-1)
     , m_dragType(ToolType::Select)
+    , m_selRung(-1)
+    , m_selCol(-1)
 {
 }
 
@@ -89,10 +91,33 @@ void LadderEditor::Render() {
     ImGui::SliderFloat("##zoom", &m_zoom, 0.5f, 2.0f, "%.2f");
     int elemCount = (int)m_elements.size();
     ImGui::Text("Elements: %d", elemCount);
+
+    ImGui::Separator();
+    ImGui::Text("Element Properties");
+    {
+        LadderElement* sel = nullptr;
+        for (auto& e : m_elements)
+            if (e.rung == m_selRung && e.col == m_selCol)
+                { sel = &e; break; }
+        if (sel) {
+            ImGui::Text("Type: %s", ToolNames[(int)sel->type]);
+            ImGui::Text("Rung: %d  Col: %d", sel->rung, sel->col);
+            ImGui::Text("Tag Name");
+            char buf[128];
+            strcpy_s(buf, sel->tagName.c_str());
+            if (ImGui::InputText("##tag", buf, sizeof(buf))) {
+                sel->tagName = buf;
+            }
+        } else {
+            ImGui::TextDisabled("No element selected");
+        }
+    }
     ImGui::End();
 
     if (ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
         m_selectedTool = ToolType::Select;
+        m_selRung = -1;
+        m_selCol = -1;
     }
 
     if (ImGui::IsKeyPressed(ImGuiKey_Delete, false) && m_lastHoveredRung >= 0 && m_lastHoveredCol >= 0) {
@@ -319,6 +344,8 @@ void LadderEditor::RenderCanvas() {
                             m_dragRung = r;
                             m_dragCol = c;
                             m_dragType = elem.type;
+                            m_selRung = r;
+                            m_selCol = c;
                             break;
                         }
                 }
@@ -333,6 +360,15 @@ void LadderEditor::RenderCanvas() {
                     DrawElementPreview(drawList,
                         ImVec2(cellCenterX, cellCenterY), colWidth * 0.4f,
                         elem.type, col);
+                    {
+                        ImVec2 ts = ImGui::CalcTextSize(elem.tagName.c_str());
+                        float sx = ts.x * 0.5f;
+                        float tx = cellCenterX - sx;
+                        float ty = cellY + rungHeight - 14 * z;
+                        drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * z * 0.65f,
+                            ImVec2(tx, ty), IM_COL32(200, 200, 200, 200),
+                            elem.tagName.c_str());
+                    }
                     hasElement = true;
                     break;
                 }
@@ -356,6 +392,8 @@ void LadderEditor::RenderCanvas() {
             && !(m_lastHoveredRung == m_dragRung && m_lastHoveredCol == m_dragCol)) {
             RemoveElement(m_dragRung, m_dragCol);
             PlaceElement(m_dragType, m_lastHoveredRung, m_lastHoveredCol);
+            m_selRung = m_lastHoveredRung;
+            m_selCol = m_lastHoveredCol;
         }
         m_isDragging = false;
     }
@@ -432,12 +470,20 @@ void LadderEditor::PlaceElement(ToolType type, int rung, int col) {
     elem.rung = rung;
     elem.col = col;
     elem.label = ToolNames[(int)type];
+    int idx = 1;
+    for (const auto& e : m_elements)
+        if (e.type == type) ++idx;
+    elem.tagName = ToolNames[(int)type] + std::string("_") + std::to_string(idx);
     m_elements.push_back(elem);
 }
 
 void LadderEditor::RemoveElement(int rung, int col) {
     for (size_t i = 0; i < m_elements.size(); ++i) {
         if (m_elements[i].rung == rung && m_elements[i].col == col) {
+            if (m_selRung == rung && m_selCol == col) {
+                m_selRung = -1;
+                m_selCol = -1;
+            }
             m_elements.erase(m_elements.begin() + i);
             return;
         }
