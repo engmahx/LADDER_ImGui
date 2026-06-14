@@ -34,9 +34,9 @@ LadderEditor::LadderEditor()
     , m_canvasScroll(0, 0)
     , m_lastHoveredRung(-1)
     , m_lastHoveredCol(-1)
-    , m_visibleRungs(0)
     , m_visibleCols(0)
     , m_prevVisibleCols(0)
+    , m_rungCount(1)
     , m_isDragging(false)
     , m_dragRung(-1)
     , m_dragCol(-1)
@@ -177,10 +177,8 @@ void LadderEditor::RenderCanvas() {
     float marginRight = 20 * z;
 
     int numCols = std::max(1, (int)((canvasSize.x - marginLeft - marginRight) / colWidth));
-    int numRungs = std::max(1, (int)((canvasSize.y - marginTop - marginRight) / (rungHeight + spacing * 2)));
     numCols = std::min(numCols, 100);
-    numRungs = std::min(numRungs, 500);
-    m_visibleRungs = numRungs;
+    m_rungCount = std::max(1, m_rungCount);
 
     if (numCols != m_prevVisibleCols) {
         int newRight = numCols - 1;
@@ -240,8 +238,8 @@ void LadderEditor::RenderCanvas() {
     m_lastHoveredRung = -1;
     m_lastHoveredCol = -1;
 
-    for (int r = 0; r < numRungs; ++r) {
-        float rungY = gridOrigin.y + r * (rungHeight + spacing * 2);
+    for (int r = 0; r < m_rungCount; ++r) {
+        float rungY = gridOrigin.y + r * (rungHeight + spacing * 2) + m_canvasScroll.y;
 
         if (rungY + rungHeight < canvasPos.y)
             continue;
@@ -392,6 +390,14 @@ void LadderEditor::RenderCanvas() {
     ImGui::InvisibleButton("canvas_bg", canvasSize,
                            ImGuiButtonFlags_MouseButtonLeft |
                            ImGuiButtonFlags_MouseButtonRight);
+
+    if (ImGui::IsItemHovered()) {
+        float wheel = ImGui::GetIO().MouseWheel;
+        if (wheel != 0.0f) {
+            float scrollStep = rungHeight + spacing * 2;
+            m_canvasScroll.y += wheel * scrollStep;
+        }
+    }
 
     if (!m_isDragging && m_selRung >= 0 && ImGui::IsMouseDragging(0, 4.0f)) {
         for (const auto& e : m_elements)
@@ -550,8 +556,21 @@ void LadderEditor::RenderToolsPanel() {
 
     ImGui::Separator();
     ImGui::Text("Rung Info");
-    ImGui::Text("Rungs: %d  Cols: %d", m_visibleRungs, m_visibleCols);
+    ImGui::Text("Rungs: %d  Cols: %d", m_rungCount, m_visibleCols);
     ImGui::Text("Zoom: %.0f%%", m_zoom * 100);
+    if (ImGui::Button("+ Add Rung", ImVec2(-1, 28))) {
+        ++m_rungCount;
+    }
+    if (ImGui::Button("- Remove Last Rung", ImVec2(-1, 28)) && m_rungCount > 1) {
+        for (auto it = m_elements.begin(); it != m_elements.end(); ) {
+            if (it->rung == m_rungCount - 1) {
+                it = m_elements.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        --m_rungCount;
+    }
 }
 
 void LadderEditor::RenderStatusBar() {

@@ -55,7 +55,7 @@ private:
 
     int m_lastHoveredRung;
     int m_lastHoveredCol;
-    int m_visibleRungs;
+    int m_rungCount;
     int m_visibleCols;
     int m_prevVisibleCols;
 
