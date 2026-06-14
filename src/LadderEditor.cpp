@@ -36,6 +36,7 @@ LadderEditor::LadderEditor()
     , m_lastHoveredCol(-1)
     , m_visibleRungs(0)
     , m_visibleCols(0)
+    , m_prevVisibleCols(0)
 {
 }
 
@@ -147,6 +148,27 @@ void LadderEditor::RenderCanvas() {
     numCols = std::min(numCols, 100);
     numRungs = std::min(numRungs, 500);
     m_visibleRungs = numRungs;
+
+    if (numCols != m_prevVisibleCols) {
+        int newRight = numCols - 1;
+        for (size_t i = 0; i < m_elements.size(); ++i) {
+            if (m_elements[i].type == ToolType::Coil || m_elements[i].type == ToolType::Output) {
+                for (size_t j = 0; j < m_elements.size(); ) {
+                    if (i != j && m_elements[j].rung == m_elements[i].rung
+                        && m_elements[j].col == newRight
+                        && m_elements[j].type != ToolType::Coil
+                        && m_elements[j].type != ToolType::Output) {
+                        m_elements.erase(m_elements.begin() + j);
+                        if (i > j) --i;
+                    } else {
+                        ++j;
+                    }
+                }
+                m_elements[i].col = newRight;
+            }
+        }
+        m_prevVisibleCols = numCols;
+    }
     m_visibleCols = numCols;
 
     ImVec2 gridOrigin = ImVec2(canvasPos.x + marginLeft, canvasPos.y + marginTop);
@@ -329,12 +351,27 @@ void LadderEditor::RenderCanvas() {
 }
 
 void LadderEditor::PlaceElement(ToolType type, int rung, int col) {
+    bool isCoilOutput = (type == ToolType::Coil || type == ToolType::Output);
+
+    if (isCoilOutput) {
+        col = m_visibleCols - 1;
+
+        for (auto& elem : m_elements) {
+            if (elem.rung == rung && (elem.type == ToolType::Coil || elem.type == ToolType::Output)) {
+                elem.type = type;
+                elem.col = col;
+                return;
+            }
+        }
+    }
+
     for (auto& elem : m_elements) {
         if (elem.rung == rung && elem.col == col) {
             elem.type = type;
             return;
         }
     }
+
     LadderElement elem;
     elem.type = type;
     elem.rung = rung;

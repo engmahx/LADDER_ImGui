@@ -56,6 +56,7 @@ private:
     int m_lastHoveredCol;
     int m_visibleRungs;
     int m_visibleCols;
+    int m_prevVisibleCols;
 
     std::vector<LadderElement> m_elements;
 };
