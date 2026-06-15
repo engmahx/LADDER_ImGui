@@ -14,23 +14,26 @@
 
 static bool g_unsavedChanges = false;
 
-static void glfw_error_callback(int error, const char* description) {
+static void glfw_error_callback(int error, const char* description)
+{
     fprintf(stderr, "GLFW Error %d: %s\n", error, description);
 }
 
-static void glfw_window_close_callback(GLFWwindow* window) {
+static void glfw_window_close_callback(GLFWwindow* window)
+{
     (void)window;
-    if (g_unsavedChanges) {
+    if (g_unsavedChanges)
+    {
         fprintf(stderr, "Warning: unsaved changes will be lost\n");
     }
 }
 
 #if defined(_WIN32)
-int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 #else
-int main(int, char**) {
+int main(int, char**)
 #endif
-
+{
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
         return 1;
@@ -76,7 +79,8 @@ int main(int, char**) {
 
     ImVec4 clearColor = ImVec4(0.08f, 0.08f, 0.10f, 1.00f);
 
-    while (!glfwWindowShouldClose(window)) {
+    while (!glfwWindowShouldClose(window))
+    {
         glfwPollEvents();
 
         ImGui_ImplOpenGL3_NewFrame();
