@@ -11,6 +11,7 @@
 #include "LadderEditor.h"
 
 #include <cstdio>
+#include <string>
 
 static bool g_unsavedChanges = false;
 
@@ -56,7 +57,18 @@ int main(int, char**)
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-    io.Fonts->AddFontFromFileTTF("JetBrainsMono-Regular.ttf", 24.0f, nullptr, io.Fonts->GetGlyphRangesDefault());
+    {
+        char exePath[MAX_PATH];
+        GetModuleFileNameA(nullptr, exePath, sizeof(exePath));
+        std::string fontDir = exePath;
+        auto pos = fontDir.find_last_of("\\/");
+        if (pos != std::string::npos)
+            fontDir.resize(pos);
+        std::string fontPath = fontDir + "\\JetBrainsMono-Regular.ttf";
+        ImFont* font = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), 24.0f, nullptr, io.Fonts->GetGlyphRangesDefault());
+        if (!font)
+            io.Fonts->AddFontFromFileTTF("JetBrainsMono-Regular.ttf", 24.0f, nullptr, io.Fonts->GetGlyphRangesDefault());
+    }
     io.Fonts->Build();
 
     ImGui::StyleColorsDark();
