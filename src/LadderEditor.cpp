@@ -8,7 +8,7 @@
 
 static const char* ToolNames[] = {
     "Select", "NO", "NC", "Coil", "Output",
-    "Timer", "Counter", "Branch", "Text"
+    "Timer", "Counter", "Branch", "BranchUp", "Text"
 };
 
 static ImU32 ToolColors[] = {
@@ -20,6 +20,7 @@ static ImU32 ToolColors[] = {
     IM_COL32(200, 100, 255, 255),
     IM_COL32(255, 150, 100, 255),
     IM_COL32(150, 150, 150, 255),
+    IM_COL32(100, 200, 200, 255),
     IM_COL32(200, 200, 200, 255),
 };
 
@@ -302,6 +303,7 @@ void LadderEditor::RenderCanvas()
                     case ToolType::Counter:
                         return 0.20f * cw;
                     case ToolType::Branch:
+                    case ToolType::BranchUp:
                         return 0.0f;
                     default:
                         return 0.20f * cw;
@@ -349,6 +351,7 @@ void LadderEditor::RenderCanvas()
             float wireY = rowY + rungHeight * 0.5f;
 
             int branchCol = -1;
+            int branchUpCol = -1;
             float branchStartX = railL;
             if (b > 0)
             {
@@ -359,18 +362,31 @@ void LadderEditor::RenderCanvas()
                         branchCol = e.col;
                         break;
                     }
+                for (const auto& e : m_elements)
+                    if (e.rung == r && e.branch == b && e.type == ToolType::BranchUp)
+                        { branchUpCol = e.col; break; }
             }
 
             {
+                float wireEndX = (branchUpCol >= 0) ? colCenter(branchUpCol) : railR;
+
                 std::vector<int> elemCols;
                 for (const auto& elem : m_elements)
                     if (elem.rung == r && elem.branch == b)
                         elemCols.push_back(elem.col);
                 std::sort(elemCols.begin(), elemCols.end());
 
+                if (branchUpCol >= 0)
+                {
+                    elemCols.erase(
+                        std::remove_if(elemCols.begin(), elemCols.end(),
+                            [branchUpCol](int c) { return c >= branchUpCol; }),
+                        elemCols.end());
+                }
+
                 if (elemCols.empty())
                 {
-                    drawList->AddLine(ImVec2(branchStartX, wireY), ImVec2(railR, wireY), wireCol, wireThick);
+                    drawList->AddLine(ImVec2(branchStartX, wireY), ImVec2(wireEndX, wireY), wireCol, wireThick);
                 } else
                 {
                     drawList->AddLine(ImVec2(branchStartX, wireY), ImVec2(colCenter(elemCols[0]) - termHalf(elemCols[0], b), wireY), wireCol, wireThick);
@@ -380,7 +396,7 @@ void LadderEditor::RenderCanvas()
                         float x2 = colCenter(elemCols[ei]) - termHalf(elemCols[ei], b);
                         drawList->AddLine(ImVec2(x1, wireY), ImVec2(x2, wireY), wireCol, wireThick);
                     }
-                    drawList->AddLine(ImVec2(colCenter(elemCols.back()) + termHalf(elemCols.back(), b), wireY), ImVec2(railR, wireY), wireCol, wireThick);
+                    drawList->AddLine(ImVec2(colCenter(elemCols.back()) + termHalf(elemCols.back(), b), wireY), ImVec2(wireEndX, wireY), wireCol, wireThick);
                 }
             }
 
@@ -406,7 +422,8 @@ void LadderEditor::RenderCanvas()
                         IM_COL32(255, 255, 255, 20));
 
                     if (m_selectedTool != ToolType::Select && ImGui::IsMouseClicked(0)
-                        && !(b > 0 && branchCol >= 0 && c < branchCol))
+                        && !(b > 0 && branchCol >= 0 && c < branchCol)
+                        && !(b > 0 && branchUpCol >= 0 && c >= branchUpCol && m_selectedTool != ToolType::BranchUp))
                     {
                         PlaceElement(m_selectedTool, r, c, b);
                         m_selectedRung = r;
@@ -454,7 +471,13 @@ void LadderEditor::RenderCanvas()
                             drawList->AddLine(ImVec2(cellCenterX, cellCenterY),
                                               ImVec2(cellCenterX, cellCenterY + vArm), col, 2.5f);
                         }
-                        if (elem.type != ToolType::Branch)
+                        if (elem.type == ToolType::BranchUp)
+                        {
+                            float vArm = rungHeight * 0.5f;
+                            drawList->AddLine(ImVec2(cellCenterX, cellCenterY),
+                                              ImVec2(cellCenterX, cellCenterY - vArm), col, 2.5f);
+                        }
+                        if (elem.type != ToolType::Branch && elem.type != ToolType::BranchUp)
                         {
                             ImVec2 ts = ImGui::CalcTextSize(elem.tagName.c_str());
                             float fontSize = 24.0f * z;
@@ -471,7 +494,8 @@ void LadderEditor::RenderCanvas()
                 }
 
                 if (!hasElement && hovered && m_selectedTool != ToolType::Select
-                    && !(b > 0 && branchCol >= 0 && c < branchCol))
+                    && !(b > 0 && branchCol >= 0 && c < branchCol)
+                    && !(b > 0 && branchUpCol >= 0 && c >= branchUpCol && m_selectedTool != ToolType::BranchUp))
                 {
                     DrawElementPreview(drawList,
                         ImVec2(cellCenterX, cellCenterY), colWidth * 0.4f,
@@ -513,6 +537,26 @@ void LadderEditor::RenderCanvas()
                     if (!blocked)
                         drawList->AddLine(ImVec2(bcolCx, topY),
                                           ImVec2(bcolCx, branch1WireY), wireCol, wireThick);
+                    break;
+                }
+        }
+
+        // vertical reconnection from BranchUp on branch 1 up to main wire
+        if (maxBranch > 0)
+        {
+            for (const auto& e : m_elements)
+                if (e.rung == r && e.branch == 1 && e.type == ToolType::BranchUp)
+                {
+                    float bcolCx = gridOrigin.x + e.col * colWidth + colWidth * 0.5f;
+                    float mainWireY = rungY + rungHeight * 0.5f;
+                    float branch1WireY = rungY + (rungHeight + spacing * 2) + rungHeight * 0.5f;
+                    bool blocked = false;
+                    for (const auto& o : m_elements)
+                        if (o.rung == r && o.branch == 0 && o.col == e.col)
+                            { blocked = true; break; }
+                    if (!blocked)
+                        drawList->AddLine(ImVec2(bcolCx, branch1WireY),
+                                          ImVec2(bcolCx, mainWireY), wireCol, wireThick);
                     break;
                 }
         }
@@ -615,6 +659,11 @@ void LadderEditor::RenderCanvas()
             if (m_lastHoveredRung >= 0)
                 PlaceElement(ToolType::Counter, m_lastHoveredRung, m_lastHoveredCol, m_lastHoveredBranch);
         }
+        if (ImGui::MenuItem("Branch Up", nullptr, false, m_lastHoveredBranch > 0))
+        {
+            if (m_lastHoveredRung >= 0)
+                PlaceElement(ToolType::BranchUp, m_lastHoveredRung, m_lastHoveredCol, m_lastHoveredBranch);
+        }
         ImGui::Separator();
         if (ImGui::MenuItem("Remove", nullptr, false, m_lastHoveredRung >= 0))
         {
@@ -626,6 +675,16 @@ void LadderEditor::RenderCanvas()
 
 void LadderEditor::PlaceElement(ToolType type, int rung, int col, int branch)
 {
+    // BranchUp: only on branch rows, one per branch
+    if (type == ToolType::BranchUp)
+    {
+        if (branch == 0) return;
+        for (const auto& e : m_elements)
+            if (e.rung == rung && e.branch == branch && e.type == ToolType::BranchUp)
+                return;
+    }
+
+    // Branch row column range
     if (branch > 0)
     {
         int bc = -1;
@@ -633,6 +692,15 @@ void LadderEditor::PlaceElement(ToolType type, int rung, int col, int branch)
             if (e.rung == rung && e.type == ToolType::Branch)
                 { bc = e.col; break; }
         if (bc >= 0 && col < bc) return;
+
+        if (type != ToolType::BranchUp)
+        {
+            int buc = -1;
+            for (const auto& e : m_elements)
+                if (e.rung == rung && e.branch == branch && e.type == ToolType::BranchUp)
+                    { buc = e.col; break; }
+            if (buc >= 0 && col >= buc) return;
+        }
     }
 
     bool isCoilOutput = (type == ToolType::Coil || type == ToolType::Output);
@@ -865,7 +933,8 @@ void LadderEditor::DrawElementPreview(ImDrawList* drawList, ImVec2 center,
         break;
 
     case ToolType::Branch:
-        // full L-shape drawn inline in RenderCanvas
+    case ToolType::BranchUp:
+        // full shape drawn inline in RenderCanvas
         drawList->AddCircle(center, 3.0f, color, 0, 1.5f);
         break;
 

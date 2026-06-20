@@ -13,6 +13,7 @@ enum class ToolType
     Timer,
     Counter,
     Branch,
+    BranchUp,
     Text,
     Count
 };
