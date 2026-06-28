@@ -317,12 +317,43 @@ void LadderEditor::RenderCanvas()
             if (e.rung == r && e.branch > maxBranch)
                 maxBranch = e.branch;
 
-        if (maxBranch == 0)
-        {
-            for (const auto& e : m_elements)
-                if (e.rung == r && e.type == ToolType::Branch)
-                    { maxBranch = 1; break; }
-        }
+        for (const auto& e : m_elements)
+            if (e.rung == r && e.type == ToolType::Branch)
+            {
+                int target = e.branch + 1;
+                if (target > maxBranch) maxBranch = target;
+            }
+
+        // Precompute BranchUp reconnection targets for this rung
+        std::vector<int> buTarget(maxBranch + 1, -1);
+        for (const auto& bu : m_elements)
+            if (bu.rung == r && bu.branch > 0 && bu.type == ToolType::BranchUp)
+            {
+                int target = -1;
+                for (int tb = bu.branch - 1; tb >= 0; tb--)
+                {
+                    bool terminated = false;
+                    for (const auto& e2 : m_elements)
+                        if (e2.rung == r && e2.branch == tb && e2.type == ToolType::BranchUp)
+                        {
+                            if (bu.col >= e2.col) { terminated = true; }
+                            break;
+                        }
+                    if (!terminated) { target = tb; break; }
+                }
+                if (target < 0) target = 0;
+                buTarget[bu.branch] = target;
+            }
+
+        struct BlockedCell { int branch; int col; };
+        std::vector<BlockedCell> blockedCells;
+        for (const auto& bu : m_elements)
+            if (bu.rung == r && bu.branch > 0 && bu.type == ToolType::BranchUp)
+            {
+                int target = buTarget[bu.branch];
+                for (int b = target; b < bu.branch; ++b)
+                    blockedCells.push_back({b, bu.col});
+            }
 
         float rungY = gridOrigin.y + r * (rungHeight + spacing * 2) + branchExtraOffset + m_canvasScroll.y;
         float totalRungH = rungHeight + maxBranch * (rungHeight + spacing * 2);
@@ -356,7 +387,7 @@ void LadderEditor::RenderCanvas()
             if (b > 0)
             {
                 for (const auto& e : m_elements)
-                    if (e.rung == r && e.branch == 0 && e.type == ToolType::Branch)
+                    if (e.rung == r && e.branch == b - 1 && e.type == ToolType::Branch)
                     {
                         branchStartX = colCenter(e.col);
                         branchCol = e.col;
@@ -410,6 +441,10 @@ void LadderEditor::RenderCanvas()
                     ImVec2(cellX, rowY),
                     ImVec2(cellX + colWidth, rowY + rungHeight));
 
+                bool blockedUpBelow = false;
+                for (const auto& bc : blockedCells)
+                    if (bc.branch == b && bc.col == c) { blockedUpBelow = true; break; }
+
                 if (hovered)
                 {
                     m_lastHoveredRung = r;
@@ -422,8 +457,9 @@ void LadderEditor::RenderCanvas()
                         IM_COL32(255, 255, 255, 20));
 
                     if (m_selectedTool != ToolType::Select && ImGui::IsMouseClicked(0)
-                        && !(b > 0 && branchCol >= 0 && c < branchCol)
-                        && !(b > 0 && branchUpCol >= 0 && c >= branchUpCol && m_selectedTool != ToolType::BranchUp))
+                        && !(b > 0 && branchCol >= 0 && c <= branchCol)
+                        && !(b > 0 && branchUpCol >= 0 && c >= branchUpCol && m_selectedTool != ToolType::BranchUp)
+                        && !blockedUpBelow)
                     {
                         PlaceElement(m_selectedTool, r, c, b);
                         m_selectedRung = r;
@@ -494,8 +530,9 @@ void LadderEditor::RenderCanvas()
                 }
 
                 if (!hasElement && hovered && m_selectedTool != ToolType::Select
-                    && !(b > 0 && branchCol >= 0 && c < branchCol)
-                    && !(b > 0 && branchUpCol >= 0 && c >= branchUpCol && m_selectedTool != ToolType::BranchUp))
+                    && !(b > 0 && branchCol >= 0 && c <= branchCol)
+                    && !(b > 0 && branchUpCol >= 0 && c >= branchUpCol && m_selectedTool != ToolType::BranchUp)
+                    && !blockedUpBelow)
                 {
                     DrawElementPreview(drawList,
                         ImVec2(cellCenterX, cellCenterY), colWidth * 0.4f,
@@ -520,46 +557,37 @@ void LadderEditor::RenderCanvas()
                 IM_COL32(255, 255, 100, 200));
         }
 
-        // vertical connection from Branch element center down to branch 1 wire
-        if (maxBranch > 0)
-        {
-            for (const auto& e : m_elements)
-                if (e.rung == r && e.type == ToolType::Branch)
-                {
-                    float bcolCx = gridOrigin.x + e.col * colWidth + colWidth * 0.5f;
-                    float cellCenterY = rungY + rungHeight * 0.5f;
-                    float topY = cellCenterY + rungHeight * 0.5f;
-                    float branch1WireY = rungY + (rungHeight + spacing * 2) + rungHeight * 0.5f;
-                    bool blocked = false;
-                    for (const auto& o : m_elements)
-                        if (o.rung == r && o.branch == 1 && o.col == e.col)
-                            { blocked = true; break; }
-                    if (!blocked)
-                        drawList->AddLine(ImVec2(bcolCx, topY),
-                                          ImVec2(bcolCx, branch1WireY), wireCol, wireThick);
-                    break;
-                }
-        }
+        // vertical connection from Branch element down to the branch row below
+        for (const auto& e : m_elements)
+            if (e.rung == r && e.type == ToolType::Branch)
+            {
+                int targetBranch = e.branch + 1;
+                if (targetBranch > maxBranch) continue;
+                float bcolCx = gridOrigin.x + e.col * colWidth + colWidth * 0.5f;
+                float upperY = rungY + e.branch * (rungHeight + spacing * 2);
+                float lowerY = rungY + targetBranch * (rungHeight + spacing * 2);
+                float topY = upperY + rungHeight * 0.5f + rungHeight * 0.5f;
+                float lowerWireY = lowerY + rungHeight * 0.5f;
+                bool blocked = false;
+                for (const auto& o : m_elements)
+                    if (o.rung == r && o.branch == targetBranch && o.col == e.col)
+                        { blocked = true; break; }
+                if (!blocked)
+                    drawList->AddLine(ImVec2(bcolCx, topY),
+                                      ImVec2(bcolCx, lowerWireY), wireCol, wireThick);
+            }
 
-        // vertical reconnection from BranchUp on branch 1 up to main wire
-        if (maxBranch > 0)
-        {
-            for (const auto& e : m_elements)
-                if (e.rung == r && e.branch == 1 && e.type == ToolType::BranchUp)
-                {
-                    float bcolCx = gridOrigin.x + e.col * colWidth + colWidth * 0.5f;
-                    float mainWireY = rungY + rungHeight * 0.5f;
-                    float branch1WireY = rungY + (rungHeight + spacing * 2) + rungHeight * 0.5f;
-                    bool blocked = false;
-                    for (const auto& o : m_elements)
-                        if (o.rung == r && o.branch == 0 && o.col == e.col)
-                            { blocked = true; break; }
-                    if (!blocked)
-                        drawList->AddLine(ImVec2(bcolCx, branch1WireY),
-                                          ImVec2(bcolCx, mainWireY), wireCol, wireThick);
-                    break;
-                }
-        }
+        // vertical reconnection from BranchUp to nearest continuous wire above
+        for (const auto& bu : m_elements)
+            if (bu.rung == r && bu.branch > 0 && bu.type == ToolType::BranchUp)
+            {
+                int targetBranch = buTarget[bu.branch];
+                float bcolCx = gridOrigin.x + bu.col * colWidth + colWidth * 0.5f;
+                float lowerWireY = rungY + bu.branch * (rungHeight + spacing * 2) + rungHeight * 0.5f;
+                float upperWireY = rungY + targetBranch * (rungHeight + spacing * 2) + rungHeight * 0.5f;
+                drawList->AddLine(ImVec2(bcolCx, lowerWireY),
+                                  ImVec2(bcolCx, upperWireY), wireCol, wireThick);
+            }
 
         branchExtraOffset += maxBranch * (rungHeight + spacing * 2);
     }
@@ -684,14 +712,42 @@ void LadderEditor::PlaceElement(ToolType type, int rung, int col, int branch)
                 return;
     }
 
+    bool isCoilOutput = (type == ToolType::Coil || type == ToolType::Output);
+
+    // Coil/Output not allowed on a branch that has a BranchUp
+    if (isCoilOutput && branch > 0)
+        for (const auto& e : m_elements)
+            if (e.rung == rung && e.branch == branch && e.type == ToolType::BranchUp)
+                return;
+
+    // Don't place where a BranchUp reconnects from a branch below
+    for (const auto& bu : m_elements)
+        if (bu.rung == rung && bu.branch > branch && bu.type == ToolType::BranchUp && bu.col == col)
+        {
+            int target = -1;
+            for (int tb = bu.branch - 1; tb >= 0; tb--)
+            {
+                bool terminated = false;
+                for (const auto& e2 : m_elements)
+                    if (e2.rung == rung && e2.branch == tb && e2.type == ToolType::BranchUp)
+                    {
+                        if (bu.col >= e2.col) { terminated = true; }
+                        break;
+                    }
+                if (!terminated) { target = tb; break; }
+            }
+            if (target < 0) target = 0;
+            if (branch >= target && branch < bu.branch) return;
+        }
+
     // Branch row column range
     if (branch > 0)
     {
         int bc = -1;
         for (const auto& e : m_elements)
-            if (e.rung == rung && e.type == ToolType::Branch)
+            if (e.rung == rung && e.branch == branch - 1 && e.type == ToolType::Branch)
                 { bc = e.col; break; }
-        if (bc >= 0 && col < bc) return;
+        if (bc >= 0 && col <= bc) return;
 
         if (type != ToolType::BranchUp)
         {
@@ -702,8 +758,6 @@ void LadderEditor::PlaceElement(ToolType type, int rung, int col, int branch)
             if (buc >= 0 && col >= buc) return;
         }
     }
-
-    bool isCoilOutput = (type == ToolType::Coil || type == ToolType::Output);
 
     if (isCoilOutput)
     {
@@ -737,6 +791,7 @@ void LadderEditor::RemoveElement(int rung, int col, int branch)
     {
         if (m_elements[i].rung == rung && m_elements[i].col == col && m_elements[i].branch == branch)
         {
+            bool isBranch = (m_elements[i].type == ToolType::Branch);
             if (m_selRung == rung && m_selCol == col && m_selBranch == branch)
             {
                 m_selRung = -1;
@@ -744,6 +799,26 @@ void LadderEditor::RemoveElement(int rung, int col, int branch)
                 m_selBranch = -1;
             }
             m_elements.erase(m_elements.begin() + i);
+
+            if (isBranch)
+            {
+                int subBranch = branch + 1;
+                for (int si = (int)m_elements.size() - 1; si >= 0; --si)
+                {
+                    if (m_elements[si].rung == rung && m_elements[si].branch >= subBranch)
+                    {
+                        if (m_selRung == rung && m_selCol == m_elements[si].col
+                            && m_selBranch == m_elements[si].branch)
+                        {
+                            m_selRung = -1;
+                            m_selCol = -1;
+                            m_selBranch = -1;
+                        }
+                        m_elements.erase(m_elements.begin() + si);
+                    }
+                }
+            }
+
             return;
         }
     }
