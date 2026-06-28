@@ -109,7 +109,7 @@ void LadderEditor::Render()
         {
             ImGui::Text("Type: %s", ToolNames[(int)sel->type]);
             ImGui::Text("Rung: %d  Branch: %d  Col: %d", sel->rung, sel->branch, sel->col);
-            if (sel->type != ToolType::Branch)
+            if (sel->type != ToolType::Branch && sel->type != ToolType::BranchUp)
             {
                 ImGui::Text("Tag Name");
                 char buf[128];
@@ -118,6 +118,20 @@ void LadderEditor::Render()
                 {
                     sel->tagName = buf;
                 }
+            }
+            if (sel->type == ToolType::Timer)
+            {
+                ImGui::Separator();
+                ImGui::Text("Timer Type");
+                const char* timerItems[] = { "ON-Delay", "OFF-Delay", "Pulse" };
+                int ti = sel->timerType;
+                if (ImGui::Combo("##timerType", &ti, timerItems, IM_ARRAYSIZE(timerItems)))
+                {
+                    sel->timerType = ti;
+                }
+                ImGui::Text("Preset Time (s)");
+                ImGui::SetNextItemWidth(120.0f);
+                ImGui::InputFloat("##timerPreset", &sel->timerPreset, 0.1f, 1.0f, "%.1f");
             }
         } else
         {
@@ -300,6 +314,7 @@ void LadderEditor::RenderCanvas()
                     case ToolType::Output:
                         return 0.18f * cw;
                     case ToolType::Timer:
+                        return 0.40f * cw;
                     case ToolType::Counter:
                         return 0.20f * cw;
                     case ToolType::Branch:
@@ -500,7 +515,7 @@ void LadderEditor::RenderCanvas()
                             col = (col & 0x00FFFFFF) | 0x40000000;
                         DrawElementPreview(drawList,
                             ImVec2(cellCenterX, cellCenterY), colWidth * 0.4f,
-                            elem.type, col);
+                            elem.type, col, &elem);
                         if (elem.type == ToolType::Branch)
                         {
                             float vArm = rungHeight * 0.5f;
@@ -521,7 +536,7 @@ void LadderEditor::RenderCanvas()
                             float tx = cellCenterX - tsx * 0.5f;
                             float ty = cellCenterY - rungHeight * 0.5f - fontSize * 1.1f;
                             drawList->AddText(ImGui::GetFont(), fontSize,
-                                ImVec2(tx, ty), IM_COL32(200, 200, 200, 220),
+                                ImVec2(tx, ty), IM_COL32(255, 255, 255, 240),
                                 elem.tagName.c_str());
                         }
                         hasElement = true;
@@ -630,14 +645,18 @@ void LadderEditor::RenderCanvas()
             for (const auto& e : m_elements)
                 if (e.rung == m_dragRung && e.col == m_dragCol && e.branch == m_dragBranch)
                     { savedTag = e.tagName; break; }
-            RemoveElement(m_dragRung, m_dragCol, m_dragBranch);
+            int oldCount = (int)m_elements.size();
             PlaceElement(m_dragType, m_lastHoveredRung, m_lastHoveredCol, m_lastHoveredBranch);
-            for (auto& e : m_elements)
-                if (e.rung == m_lastHoveredRung && e.col == m_lastHoveredCol && e.branch == m_lastHoveredBranch)
-                    { e.tagName = savedTag; break; }
-            m_selRung = m_lastHoveredRung;
-            m_selCol = m_lastHoveredCol;
-            m_selBranch = m_lastHoveredBranch;
+            if ((int)m_elements.size() > oldCount)
+            {
+                RemoveElement(m_dragRung, m_dragCol, m_dragBranch);
+                for (auto& e : m_elements)
+                    if (e.rung == m_lastHoveredRung && e.col == m_lastHoveredCol && e.branch == m_lastHoveredBranch)
+                        { e.tagName = savedTag; break; }
+                m_selRung = m_lastHoveredRung;
+                m_selCol = m_lastHoveredCol;
+                m_selBranch = m_lastHoveredBranch;
+            }
         }
         m_isDragging = false;
     }
@@ -709,6 +728,10 @@ void LadderEditor::PlaceElement(ToolType type, int rung, int col, int branch)
         if (branch == 0) return;
         for (const auto& e : m_elements)
             if (e.rung == rung && e.branch == branch && e.type == ToolType::BranchUp)
+                return;
+        // Don't strand existing elements past the new BranchUp column
+        for (const auto& e : m_elements)
+            if (e.rung == rung && e.branch == branch && e.col >= col)
                 return;
     }
 
@@ -939,7 +962,8 @@ void LadderEditor::DrawDottedGrid(ImDrawList* drawList, ImVec2 canvasPos,
 }
 
 void LadderEditor::DrawElementPreview(ImDrawList* drawList, ImVec2 center,
-                                       float size, ToolType type, ImU32 color)
+                                       float size, ToolType type, ImU32 color,
+                                       const LadderElement* elem)
 {
     float half = size * 0.5f;
     switch (type)
@@ -981,16 +1005,31 @@ void LadderEditor::DrawElementPreview(ImDrawList* drawList, ImVec2 center,
     }
 
     case ToolType::Timer:
-        drawList->AddRect(ImVec2(center.x - half, center.y - half * 0.6f),
-                          ImVec2(center.x + half, center.y + half * 0.6f),
-                          color, 0.0f, 0, 2.0f);
         {
-            const char* txt = "TON";
-            ImVec2 ts = ImGui::CalcTextSize(txt);
-            float scale = (half * 1.2f) / ts.y * 0.7f;
-            drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * scale,
-                ImVec2(center.x - ts.x * scale * 0.5f, center.y - ts.y * scale * 0.5f),
-                color, txt);
+            float rh = half * 2.0f;
+            drawList->AddRect(ImVec2(center.x - half * 2.0f, center.y - rh),
+                              ImVec2(center.x + half * 2.0f, center.y + rh),
+                              color, 0.0f, 0, 2.0f);
+            const char* timerLabels[] = { "TON", "TOF", "TP" };
+            int ti = elem ? elem->timerType : 0;
+            if (ti < 0 || ti > 2) ti = 0;
+            const char* lab = timerLabels[ti];
+            ImVec2 ls = ImGui::CalcTextSize(lab);
+            float lh = rh * 0.9f / ls.y;
+            drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * lh,
+                ImVec2(center.x - ls.x * lh * 0.5f, center.y - rh + 2),
+                color, lab);
+            if (elem)
+            {
+                char val[32];
+                snprintf(val, sizeof(val), "%.1fs", elem->timerPreset);
+                ImVec2 vs = ImGui::CalcTextSize(val);
+                float vh = rh * 0.9f / vs.y;
+                drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * vh,
+                    ImVec2(center.x - vs.x * vh * 0.5f,
+                           center.y + rh - vs.y * vh - 2),
+                    color, val);
+            }
         }
         break;
     case ToolType::Counter:

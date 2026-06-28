@@ -26,6 +26,8 @@ struct LadderElement
     int col;
     std::string label;
     std::string tagName;
+    int timerType = 0;   // 0=TON, 1=TOF, 2=TP
+    float timerPreset = 10.0f;
 };
 
 class LadderEditor
@@ -57,7 +59,8 @@ private:
     void DrawDottedGrid(ImDrawList* drawList, ImVec2 canvasPos, ImVec2 canvasSize,
                         float spacing, float radius, ImU32 color);
     void DrawElementPreview(ImDrawList* drawList, ImVec2 cellCenter, float cellSize,
-                            ToolType type, ImU32 color);
+                            ToolType type, ImU32 color,
+                            const LadderElement* elem = nullptr);
     void PlaceElement(ToolType type, int rung, int col, int branch = 0);
     void RemoveElement(int rung, int col, int branch = 0);
 
