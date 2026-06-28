@@ -28,6 +28,8 @@ struct LadderElement
     std::string tagName;
     int timerType = 0;   // 0=TON, 1=TOF, 2=TP
     float timerPreset = 10.0f;
+    int counterType = 0; // 0=CTU, 1=CTD
+    float counterPreset = 10.0f;
 };
 
 class LadderEditor
@@ -39,7 +41,7 @@ public:
     void Render();
     bool HasUnsavedChanges() const
     {
-        return !m_elements.empty();
+        return m_dirty;
     }
 
     void SetGridSpacing(float spacing)
@@ -63,6 +65,9 @@ private:
                             const LadderElement* elem = nullptr);
     void PlaceElement(ToolType type, int rung, int col, int branch = 0);
     void RemoveElement(int rung, int col, int branch = 0);
+    bool Save(const char* path);
+    bool Load(const char* path);
+    void NewFile();
 
     float m_gridSpacing;
     float m_dotRadius;
@@ -88,6 +93,9 @@ private:
     int m_selBranch;
 
     int m_selectedRung;
+
+    std::string m_filePath;
+    bool m_dirty;
 
     std::vector<LadderElement> m_elements;
 };

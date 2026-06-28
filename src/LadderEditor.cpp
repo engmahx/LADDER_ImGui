@@ -1,6 +1,17 @@
 #include "LadderEditor.h"
 #include <cmath>
 #include <algorithm>
+#include <cstdio>
+#include <cstring>
+#include <cstdlib>
+#include <sstream>
+
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <commdlg.h>
+#endif
 
 #ifndef IM_PI
 #define IM_PI 3.14159265358979323846f
@@ -48,6 +59,7 @@ LadderEditor::LadderEditor()
     , m_selCol(-1)
     , m_selBranch(-1)
     , m_selectedRung(-1)
+    , m_dirty(false)
 {
 }
 
@@ -133,6 +145,20 @@ void LadderEditor::Render()
                 ImGui::SetNextItemWidth(120.0f);
                 ImGui::InputFloat("##timerPreset", &sel->timerPreset, 0.1f, 1.0f, "%.1f");
             }
+            if (sel->type == ToolType::Counter)
+            {
+                ImGui::Separator();
+                ImGui::Text("Counter Type");
+                const char* ctrItems[] = { "Count Up", "Count Down" };
+                int ci = sel->counterType;
+                if (ImGui::Combo("##counterType", &ci, ctrItems, IM_ARRAYSIZE(ctrItems)))
+                {
+                    sel->counterType = ci;
+                }
+                ImGui::Text("Preset");
+                ImGui::SetNextItemWidth(120.0f);
+                ImGui::InputFloat("##counterPreset", &sel->counterPreset, 1.0f, 10.0f, "%.0f");
+            }
         } else
         {
             ImGui::TextDisabled("No element selected");
@@ -170,28 +196,60 @@ void LadderEditor::RenderMenuBar()
     {
         if (ImGui::BeginMenu("File"))
         {
-            ImGui::MenuItem("New Project", "Ctrl+N");
-            ImGui::MenuItem("Open", "Ctrl+O");
-            ImGui::MenuItem("Save", "Ctrl+S");
+            if (ImGui::MenuItem("New Project", "Ctrl+N"))
+            {
+                NewFile();
+            }
+            if (ImGui::MenuItem("Open", "Ctrl+O"))
+            {
+                char path[MAX_PATH] = {};
+                OPENFILENAMEA ofn = {};
+                ofn.lStructSize = sizeof(ofn);
+                ofn.hwndOwner = GetActiveWindow();
+                ofn.lpstrFilter = "LADDER Files\0*.ldr\0All Files\0*.*\0";
+                ofn.lpstrFile = path;
+                ofn.nMaxFile = sizeof(path);
+                ofn.Flags = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+                if (GetOpenFileNameA(&ofn))
+                    Load(path);
+            }
+            if (ImGui::MenuItem("Save", "Ctrl+S"))
+            {
+                if (!m_filePath.empty())
+                {
+                    Save(m_filePath.c_str());
+                } else
+                {
+                    char path[MAX_PATH] = {};
+                    OPENFILENAMEA ofn = {};
+                    ofn.lStructSize = sizeof(ofn);
+                    ofn.hwndOwner = GetActiveWindow();
+                    ofn.lpstrFilter = "LADDER Files\0*.ldr\0All Files\0*.*\0";
+                    ofn.lpstrFile = path;
+                    ofn.nMaxFile = sizeof(path);
+                    ofn.Flags = OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
+                    if (GetSaveFileNameA(&ofn))
+                        Save(path);
+                }
+            }
+            if (ImGui::MenuItem("Save As..."))
+            {
+                char path[MAX_PATH] = {};
+                OPENFILENAMEA ofn = {};
+                ofn.lStructSize = sizeof(ofn);
+                ofn.hwndOwner = GetActiveWindow();
+                ofn.lpstrFilter = "LADDER Files\0*.ldr\0All Files\0*.*\0";
+                ofn.lpstrFile = path;
+                ofn.nMaxFile = sizeof(path);
+                ofn.Flags = OFN_OVERWRITEPROMPT | OFN_HIDEREADONLY;
+                if (GetSaveFileNameA(&ofn))
+                    Save(path);
+            }
             ImGui::Separator();
-            ImGui::MenuItem("Exit", "Alt+F4");
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Edit"))
-        {
-            ImGui::MenuItem("Undo", "Ctrl+Z");
-            ImGui::MenuItem("Redo", "Ctrl+Y");
-            ImGui::Separator();
-            ImGui::MenuItem("Cut", "Ctrl+X");
-            ImGui::MenuItem("Copy", "Ctrl+C");
-            ImGui::MenuItem("Paste", "Ctrl+V");
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("View"))
-        {
-            ImGui::MenuItem("Zoom In", "Ctrl++");
-            ImGui::MenuItem("Zoom Out", "Ctrl+-");
-            ImGui::MenuItem("Reset Zoom", "Ctrl+0");
+            if (ImGui::MenuItem("Exit", "Alt+F4"))
+            {
+                std::exit(0);
+            }
             ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Help"))
@@ -316,7 +374,7 @@ void LadderEditor::RenderCanvas()
                     case ToolType::Timer:
                         return 0.40f * cw;
                     case ToolType::Counter:
-                        return 0.20f * cw;
+                        return 0.40f * cw;
                     case ToolType::Branch:
                     case ToolType::BranchUp:
                         return 0.0f;
@@ -806,6 +864,7 @@ void LadderEditor::PlaceElement(ToolType type, int rung, int col, int branch)
         if (e.type == type && e.branch == branch) ++idx;
     elem.tagName = ToolNames[(int)type] + std::string("_") + std::to_string(idx);
     m_elements.push_back(elem);
+    m_dirty = true;
 }
 
 void LadderEditor::RemoveElement(int rung, int col, int branch)
@@ -842,9 +901,93 @@ void LadderEditor::RemoveElement(int rung, int col, int branch)
                 }
             }
 
+            m_dirty = true;
             return;
         }
     }
+}
+
+void LadderEditor::NewFile()
+{
+    m_elements.clear();
+    m_selRung = -1;
+    m_selCol = -1;
+    m_selBranch = -1;
+    m_selectedRung = -1;
+    m_rungCount = 1;
+    m_filePath.clear();
+    m_dirty = false;
+}
+
+bool LadderEditor::Save(const char* path)
+{
+    FILE* fp;
+    if (fopen_s(&fp, path, "w") != 0 || !fp)
+        return false;
+
+    fprintf(fp, "LADDER_FILE v1\n");
+    for (const auto& e : m_elements)
+    {
+        fprintf(fp, "%d\t%d\t%d\t%d\t%s\t%d\t%.1f\t%d\t%.0f\n",
+                (int)e.type, e.rung, e.branch, e.col,
+                e.tagName.c_str(),
+                e.timerType, e.timerPreset,
+                e.counterType, e.counterPreset);
+    }
+    fclose(fp);
+
+    m_filePath = path;
+    m_dirty = false;
+    return true;
+}
+
+bool LadderEditor::Load(const char* path)
+{
+    FILE* fp;
+    if (fopen_s(&fp, path, "r") != 0 || !fp)
+        return false;
+
+    char line[4096];
+    if (!fgets(line, sizeof(line), fp) || strncmp(line, "LADDER_FILE v1", 14) != 0)
+    {
+        fclose(fp);
+        return false;
+    }
+
+    std::vector<LadderElement> loaded;
+    while (fgets(line, sizeof(line), fp))
+    {
+        LadderElement e;
+        char tag[256] = {};
+        int typeInt = 0;
+        if (sscanf_s(line, "%d\t%d\t%d\t%d\t%255[^\t]\t%d\t%f\t%d\t%f",
+                     &typeInt, &e.rung, &e.branch, &e.col,
+                     tag, (unsigned)sizeof(tag),
+                     &e.timerType, &e.timerPreset,
+                     &e.counterType, &e.counterPreset) >= 5)
+        {
+            e.type = (ToolType)typeInt;
+            e.tagName = tag;
+            e.label = ToolNames[typeInt];
+            loaded.push_back(e);
+        }
+    }
+    fclose(fp);
+
+    m_elements = std::move(loaded);
+    m_filePath = path;
+    m_dirty = false;
+    m_selRung = -1;
+    m_selCol = -1;
+    m_selBranch = -1;
+    m_selectedRung = -1;
+
+    int maxRung = 0;
+    for (const auto& e : m_elements)
+        if (e.rung > maxRung) maxRung = e.rung;
+    m_rungCount = std::max(1, maxRung + 1);
+
+    return true;
 }
 
 void LadderEditor::RenderToolsPanel()
@@ -1033,16 +1176,31 @@ void LadderEditor::DrawElementPreview(ImDrawList* drawList, ImVec2 center,
         }
         break;
     case ToolType::Counter:
-        drawList->AddRect(ImVec2(center.x - half, center.y - half * 0.6f),
-                          ImVec2(center.x + half, center.y + half * 0.6f),
-                          color, 0.0f, 0, 2.0f);
         {
-            const char* txt = "CTU";
-            ImVec2 ts = ImGui::CalcTextSize(txt);
-            float scale = (half * 1.2f) / ts.y * 0.7f;
-            drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * scale,
-                ImVec2(center.x - ts.x * scale * 0.5f, center.y - ts.y * scale * 0.5f),
-                color, txt);
+            float rh = half * 2.0f;
+            drawList->AddRect(ImVec2(center.x - half * 2.0f, center.y - rh),
+                              ImVec2(center.x + half * 2.0f, center.y + rh),
+                              color, 0.0f, 0, 2.0f);
+            const char* ctrLabels[] = { "CTU", "CTD" };
+            int ti = elem ? elem->counterType : 0;
+            if (ti < 0 || ti > 1) ti = 0;
+            const char* lab = ctrLabels[ti];
+            ImVec2 ls = ImGui::CalcTextSize(lab);
+            float lh = rh * 0.9f / ls.y;
+            drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * lh,
+                ImVec2(center.x - ls.x * lh * 0.5f, center.y - rh + 2),
+                color, lab);
+            if (elem)
+            {
+                char val[32];
+                snprintf(val, sizeof(val), "%.0f", elem->counterPreset);
+                ImVec2 vs = ImGui::CalcTextSize(val);
+                float vh = rh * 0.9f / vs.y;
+                drawList->AddText(ImGui::GetFont(), ImGui::GetFontSize() * vh,
+                    ImVec2(center.x - vs.x * vh * 0.5f,
+                           center.y + rh - vs.y * vh - 2),
+                    color, val);
+            }
         }
         break;
 
